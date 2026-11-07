@@ -1,0 +1,284 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#101827">
+<title>Bhunu' Weather</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#0b1220;color:#f8fafc;
+ font-family:Arial,sans-serif;min-height:100vh
+}
+header{
+ padding:20px;display:flex;align-items:center;
+ justify-content:space-between;border-bottom:1px solid #263247
+}
+.logo{font-size:21px;font-weight:bold}
+.logo span{color:#38bdf8}
+main{max-width:850px;margin:auto;padding:22px 16px}
+h1{font-size:27px;margin-bottom:8px}
+.muted{color:#94a3b8}
+.search{display:flex;gap:9px;margin:22px 0}
+input{
+ flex:1;min-width:0;padding:15px;border-radius:12px;
+ border:1px solid #334155;background:#172235;
+ color:white;font-size:16px;outline:none
+}
+button{
+ border:0;border-radius:12px;padding:13px 16px;
+ background:#0284c7;color:white;font-weight:bold;
+ cursor:pointer
+}
+button:disabled{opacity:.5}
+#results{display:grid;gap:8px;margin-bottom:18px}
+.result{
+ text-align:left;background:#172235;border:1px solid #334155;
+ padding:13px;border-radius:10px;color:white
+}
+.card{
+ background:#172235;border:1px solid #28374c;
+ border-radius:18px;padding:20px;margin-top:17px
+}
+#current{display:none}
+.place{color:#94a3b8;font-size:14px}
+.temp{font-size:65px;font-weight:bold;margin:10px 0}
+.condition{font-size:18px;color:#cbd5e1}
+.weather-icon{font-size:48px}
+.details{
+ display:grid;grid-template-columns:repeat(2,1fr);
+ gap:12px;margin-top:22px
+}
+.detail{
+ background:#223149;padding:15px;border-radius:12px
+}
+.detail small{color:#94a3b8}
+.detail strong{display:block;font-size:21px;margin-top:8px}
+.forecast{
+ display:grid;grid-template-columns:repeat(4,1fr);
+ gap:9px;margin-top:16px
+}
+.day{
+ background:#223149;border-radius:12px;
+ padding:12px 5px;text-align:center;font-size:13px
+}
+.day b{display:block;margin:8px 0}
+.error{color:#fca5a5;margin:12px 0}
+footer{text-align:center;padding:30px;color:#64748b;font-size:13px}
+@media(max-width:480px){
+ .search{flex-wrap:wrap}
+ .search input{width:100%;flex-basis:100%}
+ .forecast{grid-template-columns:repeat(2,1fr)}
+ .temp{font-size:55px}
+}
+</style>
+</head>
+<body>
+<header>
+ <div class="logo">☁ Bhunu'<span>Weather</span></div>
+ <span class="muted">WORLDWIDE</span>
+</header>
+
+<main>
+ <h1>Weather Forecast</h1>
+ <p class="muted">Discover weather conditions anywhere in the world.</p>
+
+ <div class="search">
+  <input id="city" placeholder="Search city, e.g. Manzini, London..."
+   aria-label="Search city" />
+  <button id="searchBtn" onclick="searchCity()">Search</button>
+  <button onclick="myLocation()" title="Use my location">⌖</button>
+ </div>
+
+ <div id="status" class="muted"></div>
+ <div id="results"></div>
+ <div id="error" class="error"></div>
+
+ <section id="current" class="card">
+  <div class="place" id="location"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between">
+   <div>
+    <div class="temp" id="temperature"></div>
+    <div class="condition" id="condition"></div>
+   </div>
+   <div class="weather-icon" id="weatherIcon"></div>
+  </div>
+
+  <div class="details">
+   <div class="detail"><small>Humidity</small><strong id="humidity"></strong></div>
+   <div class="detail"><small>Feels like</small><strong id="feels"></strong></div>
+   <div class="detail"><small>Wind speed</small><strong id="wind"></strong></div>
+   <div class="detail"><small>Rain probability</small><strong id="rain"></strong></div>
+   <div class="detail"><small>UV index</small><strong id="uv"></strong></div>
+   <div class="detail"><small>Precipitation</small><strong id="precip"></strong></div>
+   <div class="detail"><small>Sunrise</small><strong id="sunrise"></strong></div>
+   <div class="detail"><small>Sunset</small><strong id="sunset"></strong></div>
+  </div>
+ </section>
+
+ <section id="forecast" class="card" style="display:none">
+  <h2>7-Day Forecast</h2>
+  <div class="forecast" id="days"></div>
+ </section>
+</main>
+
+<footer>© 2026 Bhunu' Weather · Weather data by Open-Meteo</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function weatherInfo(code){
+ const data={
+  0:["Clear sky","☀️"],
+  1:["Mainly clear","🌤️"],
+  2:["Partly cloudy","⛅"],
+  3:["Overcast","☁️"],
+  45:["Fog","🌫️"],
+  48:["Rime fog","🌫️"],
+  51:["Light drizzle","🌦️"],
+  53:["Drizzle","🌦️"],
+  55:["Heavy drizzle","🌧️"],
+  61:["Light rain","🌧️"],
+  63:["Rain","🌧️"],
+  65:["Heavy rain","🌧️"],
+  71:["Light snow","🌨️"],
+  73:["Snow","❄️"],
+  75:["Heavy snow","❄️"],
+  80:["Rain showers","🌦️"],
+  81:["Rain showers","🌧️"],
+  82:["Heavy showers","⛈️"],
+  95:["Thunderstorm","⛈️"],
+  96:["Thunderstorm with hail","⛈️"],
+  99:["Severe thunderstorm","⛈️"]
+ };
+ return data[code] || ["Unknown conditions","🌡️"];
+}
+
+function showError(message){
+ $("error").textContent=message;
+ $("status").textContent="";
+}
+
+async function searchCity(){
+ const query=$("city").value.trim();
+ if(!query){showError("Please enter a city name.");return;}
+ $("error").textContent="";
+ $("results").innerHTML="";
+ $("current").style.display="none";
+ $("forecast").style.display="none";
+ $("status").textContent="Searching worldwide locations...";
+ $("searchBtn").disabled=true;
+
+ try{
+  const url="https://geocoding-api.open-meteo.com/v1/search?name="+
+   encodeURIComponent(query)+"&count=10&language=en&format=json";
+  const response=await fetch(url);
+  if(!response.ok) throw new Error("Location search failed.");
+  const data=await response.json();
+  $("status").textContent="";
+  if(!data.results?.length){
+   showError("No locations found. Try another city.");
+   return;
+  }
+
+  $("results").innerHTML=data.results.map((p,i)=>
+   `<button class="result" data-index="${i}">
+    ${p.name}, ${p.admin1 || p.country || ""}
+    · ${p.country || ""} ${p.country_code ? "("+p.country_code+")" : ""}
+   </button>`
+  ).join("");
+
+  [...$("results").querySelectorAll("button")].forEach(btn=>{
+   btn.addEventListener("click",()=>{
+    const p=data.results[Number(btn.dataset.index)];
+    $("results").innerHTML="";
+    getWeather(p);
+   });
+  });
+ }catch(e){
+  showError("Could not search locations. Check your internet connection.");
+ }finally{
+  $("searchBtn").disabled=false;
+ }
+}
+
+async function getWeather(place){
+ $("error").textContent="";
+ $("status").textContent="Loading live weather...";
+ $("current").style.display="none";
+ $("forecast").style.display="none";
+
+ try{
+  const params=new URLSearchParams({
+   latitude:place.latitude,
+   longitude:place.longitude,
+   current:"temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,uv_index",
+   daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,sunrise,sunset",
+   timezone:"auto",
+   forecast_days:"7"
+  });
+
+  const response=await fetch("https://api.open-meteo.com/v1/forecast?"+params);
+  if(!response.ok) throw new Error("Weather request failed.");
+  const data=await response.json();
+  const c=data.current,d=data.daily;
+  const [description,emoji]=weatherInfo(c.weather_code);
+
+  $("location").textContent=
+   [place.name,place.admin1,place.country].filter(Boolean).join(", ");
+  $("temperature").textContent=Math.round(c.temperature_2m)+"°C";
+  $("condition").textContent=description;
+  $("weatherIcon").textContent=emoji;
+  $("humidity").textContent=c.relative_humidity_2m+"%";
+  $("feels").textContent=Math.round(c.apparent_temperature)+"°C";
+  $("wind").textContent=c.wind_speed_10m+" km/h";
+  $("rain").textContent=(d.precipitation_probability_max?.[0] ?? "N/A")+"%";
+  $("uv").textContent=c.uv_index;
+  $("precip").textContent=c.precipitation+" mm";
+  $("sunrise").textContent=d.sunrise[0].slice(11,16);
+  $("sunset").textContent=d.sunset[0].slice(11,16);
+
+  $("days").innerHTML=d.time.map((date,i)=>{
+   const [desc,icon]=weatherInfo(d.weather_code[i]);
+   const day=i===0?"Today":new Date(date+"T12:00:00").toLocaleDateString("en",{weekday:"short"});
+   return `<div class="day">
+    ${day}<br><b>${icon}</b>
+    ${Math.round(d.temperature_2m_max[i])}° / ${Math.round(d.temperature_2m_min[i])}°
+    <p>${d.precipitation_probability_max?.[i] ?? "—"}% rain</p>
+   </div>`;
+  }).join("");
+
+  $("current").style.display="block";
+  $("forecast").style.display="block";
+  $("status").textContent="Last updated: "+c.time.replace("T"," ");
+ }catch(e){
+  showError("Unable to load weather. Please check your connection and try again.");
+  $("status").textContent="";
+ }
+}
+
+function myLocation(){
+ if(!navigator.geolocation){
+  showError("Location services are not supported by this browser.");
+  return;
+ }
+ $("status").textContent="Finding your location...";
+ navigator.geolocation.getCurrentPosition(async pos=>{
+  getWeather({
+   name:"Your location",
+   latitude:pos.coords.latitude,
+   longitude:pos.coords.longitude
+  });
+ },()=>{
+  showError("Location permission denied or location unavailable. Search for a city instead.");
+ });
+}
+
+$("city").addEventListener("keydown",e=>{
+ if(e.key==="Enter") searchCity();
+});
+</script>
+</body>
+</html>
